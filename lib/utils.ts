@@ -19,6 +19,17 @@ export function calcDiscount(original: number, current: number): number {
   return Math.round(((original - current) / original) * 100);
 }
 
+export function toMessage(err: unknown): string {
+  if (!err) return '';
+  if (typeof err === 'string') return err;
+  if (typeof err === 'object') {
+    // Zod issue objects always have a string `message` property
+    const e = err as Record<string, unknown>;
+    if (typeof e.message === 'string') return e.message;
+  }
+  return '';   // drop anything else silently — never render [object Object]
+}
+
 // ─── Truncate text ────────────────────────────────────────────────
 export function truncate(text: string, length: number): string {
   if (text.length <= length) return text;
