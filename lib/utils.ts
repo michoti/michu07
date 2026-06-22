@@ -35,3 +35,35 @@ export function truncate(text: string, length: number): string {
   if (text.length <= length) return text;
   return text.slice(0, length).trimEnd() + '…';
 }
+
+
+// ─── Slugify ──────────────────────────────────────────────────────
+export function slugify(text: string): string {
+  return text.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
+}
+
+// ─── Generate order number ────────────────────────────────────────
+export function generateOrderNumber(): string {
+  const ts = Date.now().toString(36).toUpperCase();
+  const rand = Math.random().toString(36).slice(2, 5).toUpperCase();
+  return `M07-${ts}-${rand}`;
+}
+
+// ─── Image placeholder ────────────────────────────────────────────
+export function watchPlaceholder(seed?: string): string {
+  return `https://picsum.photos/seed/${seed ?? 'watch'}/600/800`;
+}
+
+// ─── Debounce ────────────────────────────────────────────────────
+export function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number): (...args: Parameters<T>) => void {
+  let timer: ReturnType<typeof setTimeout>;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), ms);
+  };
+}
+
+// ─── Clamp number ────────────────────────────────────────────────
+export function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
