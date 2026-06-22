@@ -6,15 +6,29 @@ import { Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from '@tanstack/react-form';
 import { Logo } from '@/components/shared/Logo';
+import { FieldError } from '@/components/shared/FieldError';
 import { ROUTES } from '@/constants';
-import { supabase } from '@/lib/supabase';
 import { loginSchema } from '@/lib/zodSchema';
 import { toMessage } from '@/lib/utils';
-import { FieldError } from '@/components/shared/FieldError';
+import { useAuth } from '@/context/AuthContext';
 
+// ─── Label style — shared across fields ──────────────────────────
+const labelStyle: React.CSSProperties = {
+  fontSize: '0.72rem',
+  color: 'var(--platinum)',
+  opacity: 0.5,
+  letterSpacing: '0.1em',
+  textTransform: 'uppercase',
+  display: 'block',
+  marginBottom: '0.4rem',
+};
+
+// ─── Page ────────────────────────────────────────────────────────
 export default function LoginPage() {
+  const { signIn, signInWithOAuth } = useAuth();
   const router = useRouter();
   const [showPass, setShowPass] = useState(false);
+  const [oauthError, setOauthError] = useState<string | null>(null);
 
   const form = useForm({
     defaultValues: {
@@ -22,20 +36,18 @@ export default function LoginPage() {
       password: '',
     },
     onSubmit: async ({ value }) => {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: value.email,
-        password: value.password,
-      });
+      const { error } = await signIn(value.email, value.password);
       if (error) throw new Error(error.message);
-      router.push(ROUTES.DASHBOARD);
+      const next = new URLSearchParams(window.location.search).get('next') ?? ROUTES.DASHBOARD;
+      router.push(next);
     },
   });
 
   const handleGoogle = async () => {
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: `${window.location.origin}${ROUTES.DASHBOARD}` },
-    });
+    setOauthError(null);
+    const { error } = await signInWithOAuth('google');
+    // OAuth redirects the browser on success — only surface errors
+    if (error) setOauthError(error.message);
   };
 
   return (
@@ -85,6 +97,8 @@ export default function LoginPage() {
               return (
                 <div
                   className="flex items-start gap-2 p-3"
+                  role="alert"
+                  aria-live="assertive"
                   style={{
                     background: 'rgba(248,113,113,0.1)',
                     border: '1px solid rgba(248,113,113,0.2)',
@@ -110,156 +124,146 @@ export default function LoginPage() {
             className="space-y-4"
             noValidate
           >
-            {/* ── Email ── */}
+            {/* ── Email ─────────────────────────────────────────── */}
             <form.Field
               name="email"
               validators={{
-                onBlur: loginSchema.shape.email,
+                onBlur:   loginSchema.shape.email,
                 onSubmit: loginSchema.shape.email,
               }}
             >
-              {(field) => (
-                <div>
-                  <label
-                    htmlFor={field.name}
-                    style={{
-                      fontSize: '0.72rem',
-                      color: 'var(--platinum)',
-                      opacity: 0.5,
-                      letterSpacing: '0.1em',
-                      textTransform: 'uppercase',
-                      display: 'block',
-                      marginBottom: '0.4rem',
-                    }}
-                  >
-                    Email
-                  </label>
-                  <div className="relative">
-                    <Mail
-                      size={16}
-                      style={{
-                        position: 'absolute',
-                        left: '1rem',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        color: 'var(--platinum)',
-                        opacity: field.state.meta.errors.length ? 0.6 : 0.35,
-                      }}
-                    />
-                    <input
-                      id={field.name}
-                      name={field.name}
-                      type="email"
-                      value={field.state.value}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                      onBlur={field.handleBlur}
-                      className="input-luxury"
-                      style={{
-                        paddingLeft: '2.5rem',
-                        borderColor: field.state.meta.errors.length
-                          ? 'rgba(248,113,113,0.5)'
-                          : undefined,
-                      }}
-                      placeholder="your@email.com"
-                      autoComplete="email"
-                    />
+              {(field) => {
+                const hasError = field.state.meta.errors.length > 0;
+                return (
+                  <div>
+                    <label htmlFor={field.name} style={labelStyle}>
+                      Email
+                    </label>
+                    <div className="relative">
+                      <Mail
+                        size={16}
+                        style={{
+                          position: 'absolute',
+                          left: '1rem',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          color: 'var(--platinum)',
+                          opacity: hasError ? 0.6 : 0.35,
+                        }}
+                      />
+                      <input
+                        id={field.name}
+                        name={field.name}
+                        type="email"
+                        value={field.state.value}
+                        onChange={(e) => field.handleChange(e.target.value)}
+                        onBlur={field.handleBlur}
+                        className="input-luxury"
+                        style={{
+                          paddingLeft: '2.5rem',
+                          borderColor: hasError ? 'rgba(248,113,113,0.5)' : undefined,
+                        }}
+                        placeholder="your@email.com"
+                        autoComplete="email"
+                        aria-invalid={hasError}
+                        aria-describedby={hasError ? `${field.name}-error` : undefined}
+                      />
+                    </div>
+                    <FieldError errors={field.state.meta.errors} />
                   </div>
-                  <FieldError errors={field.state.meta.errors} />
-                </div>
-              )}
+                );
+              }}
             </form.Field>
 
-            {/* ── Password ── */}
+            {/* ── Password ──────────────────────────────────────── */}
             <form.Field
               name="password"
               validators={{
-                onBlur: loginSchema.shape.password,
+                onBlur:   loginSchema.shape.password,
                 onSubmit: loginSchema.shape.password,
               }}
             >
-              {(field) => (
-                <div>
-                  <div className="flex justify-between items-center mb-1.5">
-                    <label
-                      htmlFor={field.name}
-                      style={{
-                        fontSize: '0.72rem',
-                        color: 'var(--platinum)',
-                        opacity: 0.5,
-                        letterSpacing: '0.1em',
-                        textTransform: 'uppercase',
-                      }}
-                    >
-                      Password
-                    </label>
-                    <Link
-                      href="/auth/forgot-password"
-                      style={{ fontSize: '0.72rem', color: 'var(--gold)', textDecoration: 'none' }}
-                    >
-                      Forgot?
-                    </Link>
+              {(field) => {
+                const hasError = field.state.meta.errors.length > 0;
+                return (
+                  <div>
+                    <div className="flex justify-between items-center" style={{ marginBottom: '0.4rem' }}>
+                      <label
+                        htmlFor={field.name}
+                        style={{ ...labelStyle, marginBottom: 0 }}
+                      >
+                        Password
+                      </label>
+                      <Link
+                        href="/auth/forgot-password"
+                        style={{ fontSize: '0.72rem', color: 'var(--gold)', textDecoration: 'none' }}
+                      >
+                        Forgot?
+                      </Link>
+                    </div>
+                    <div className="relative">
+                      <Lock
+                        size={16}
+                        style={{
+                          position: 'absolute',
+                          left: '1rem',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          color: 'var(--platinum)',
+                          opacity: hasError ? 0.6 : 0.35,
+                        }}
+                      />
+                      <input
+                        id={field.name}
+                        name={field.name}
+                        type={showPass ? 'text' : 'password'}
+                        value={field.state.value}
+                        onChange={(e) => field.handleChange(e.target.value)}
+                        onBlur={field.handleBlur}
+                        className="input-luxury"
+                        style={{
+                          paddingLeft: '2.5rem',
+                          paddingRight: '2.5rem',
+                          borderColor: hasError ? 'rgba(248,113,113,0.5)' : undefined,
+                        }}
+                        placeholder="••••••••"
+                        autoComplete="current-password"
+                        aria-invalid={hasError}
+                        aria-describedby={hasError ? `${field.name}-error` : undefined}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPass((prev) => !prev)}
+                        style={{
+                          position: 'absolute',
+                          right: '1rem',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: 'var(--platinum)',
+                          opacity: 0.35,
+                        }}
+                        aria-label={showPass ? 'Hide password' : 'Show password'}
+                      >
+                        {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                    <FieldError errors={field.state.meta.errors} />
                   </div>
-                  <div className="relative">
-                    <Lock
-                      size={16}
-                      style={{
-                        position: 'absolute',
-                        left: '1rem',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        color: 'var(--platinum)',
-                        opacity: field.state.meta.errors.length ? 0.6 : 0.35,
-                      }}
-                    />
-                    <input
-                      id={field.name}
-                      name={field.name}
-                      type={showPass ? 'text' : 'password'}
-                      value={field.state.value}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                      onBlur={field.handleBlur}
-                      className="input-luxury"
-                      style={{
-                        paddingLeft: '2.5rem',
-                        paddingRight: '2.5rem',
-                        borderColor: field.state.meta.errors.length
-                          ? 'rgba(248,113,113,0.5)'
-                          : undefined,
-                      }}
-                      placeholder="••••••••"
-                      autoComplete="current-password"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPass((prev) => !prev)}
-                      style={{
-                        position: 'absolute',
-                        right: '1rem',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        color: 'var(--platinum)',
-                        opacity: 0.35,
-                      }}
-                      aria-label={showPass ? 'Hide password' : 'Show password'}
-                    >
-                      {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
-                  </div>
-                  <FieldError errors={field.state.meta.errors} />
-                </div>
-              )}
+                );
+              }}
             </form.Field>
 
-            {/* ── Submit ── */}
-            <form.Subscribe selector={(s) => [s.isSubmitting, s.canSubmit]}>
+            {/* ── Submit ────────────────────────────────────────── */}
+            <form.Subscribe selector={(s) => [s.isSubmitting, s.canSubmit] as const}>
               {([isSubmitting, canSubmit]) => (
                 <button
                   type="submit"
                   className="btn-gold w-full justify-center"
                   disabled={isSubmitting || !canSubmit}
+                  aria-busy={isSubmitting}
                 >
                   {isSubmitting ? 'Signing in…' : 'Sign In'}
                 </button>
@@ -273,7 +277,28 @@ export default function LoginPage() {
             <div className="flex-1 divider-gold" />
           </div>
 
+
+          {oauthError && (
+            <div
+              className="flex items-start gap-2 p-3"
+              role="alert"
+              aria-live="assertive"
+              style={{
+                background: 'rgba(248,113,113,0.1)',
+                border: '1px solid rgba(248,113,113,0.2)',
+              }}
+            >
+              <AlertCircle
+                size={15}
+                style={{ color: '#F87171', flexShrink: 0, marginTop: '0.05rem' }}
+              />
+              <p style={{ fontSize: '0.82rem', color: '#F87171', lineHeight: 1.5 }}>
+                {oauthError}
+              </p>
+            </div>
+          )}
           <button
+            type="button"
             onClick={handleGoogle}
             className="btn-outline w-full justify-center gap-3"
             style={{ fontSize: '0.78rem' }}

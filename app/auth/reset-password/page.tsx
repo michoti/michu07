@@ -2,18 +2,15 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Mail, Lock, User, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Lock, Eye, EyeOff, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { useState } from 'react';
 import { useForm } from '@tanstack/react-form';
 import { Logo } from '@/components/shared/Logo';
 import { FieldError } from '@/components/shared/FieldError';
 import { ROUTES } from '@/constants';
-import { registerSchema } from '@/lib/zodSchema';
+import { resetPasswordSchema } from '@/lib/zodSchema';
 import { toMessage } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
-
-// ─── Constants ───────────────────────────────────────────────────
-const termsValidator = (val: boolean): string | undefined =>
-  val ? undefined : 'You must accept the Terms of Service and Privacy Policy';
 
 // ─── Label style — shared across fields ──────────────────────────
 const labelStyle: React.CSSProperties = {
@@ -27,27 +24,20 @@ const labelStyle: React.CSSProperties = {
 };
 
 // ─── Page ────────────────────────────────────────────────────────
-export default function RegisterPage() {
-  const { signUp } = useAuth();
+export default function ResetPasswordPage() {
+  const { updatePassword } = useAuth();
   const router = useRouter();
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const form = useForm({
     defaultValues: {
-      name:     '',
-      email:    '',
       password: '',
-      terms:    false as boolean,
+      confirmPassword: '',
     },
     onSubmit: async ({ value }) => {
-      const { error } = await signUp(value.email, value.password, value.name);
-
-      // Surface Supabase / network errors as a form-level error so the
-      // global error banner picks them up via form.Subscribe.
+      const { error } = await updatePassword(value.password);
       if (error) throw new Error(error.message);
-
-      // On success the form enters isSubmitSuccessful — success UI renders below.
-      // Pre-warm the login route so the "Back to Sign In" link is instant.
-      router.prefetch(ROUTES.LOGIN);
     },
   });
 
@@ -75,7 +65,7 @@ export default function RegisterPage() {
             className="font-display"
             style={{ fontSize: '1.8rem', fontWeight: 400, color: 'var(--platinum)' }}
           >
-            Check your email
+            Password updated
           </h2>
 
           <p
@@ -86,16 +76,16 @@ export default function RegisterPage() {
               lineHeight: 1.7,
             }}
           >
-            We&apos;ve sent a confirmation link to{' '}
-            <strong style={{ color: 'var(--gold)' }}>
-              {form.state.values.email}
-            </strong>
-            . Click the link to activate your account.
+            Your password has been reset successfully. Sign in with your new credentials.
           </p>
 
-          <Link href={ROUTES.LOGIN} className="btn-gold inline-flex">
-            Back to Sign In
-          </Link>
+          <button
+            type="button"
+            className="btn-gold inline-flex"
+            onClick={() => router.push(ROUTES.LOGIN)}
+          >
+            Sign In
+          </button>
         </div>
       </div>
     );
@@ -132,16 +122,27 @@ export default function RegisterPage() {
           }}
         >
           <div>
-            <p className="eyebrow mb-1">New Member</p>
+            <p className="eyebrow mb-1">Account Recovery</p>
             <h1
               className="font-display"
               style={{ fontSize: '1.8rem', fontWeight: 400, color: 'var(--platinum)' }}
             >
-              Create Account
+              New Password
             </h1>
+            <p
+              style={{
+                fontSize: '0.85rem',
+                color: 'var(--platinum)',
+                opacity: 0.5,
+                marginTop: '0.5rem',
+                lineHeight: 1.6,
+              }}
+            >
+              Choose a strong password for your account.
+            </p>
           </div>
 
-          {/* Global error banner — fires on thrown errors from onSubmit */}
+          {/* Global error banner */}
           <form.Subscribe selector={(s) => s.errors}>
             {(errors) => {
               const msg = errors.map(toMessage).filter(Boolean).join('. ');
@@ -176,114 +177,12 @@ export default function RegisterPage() {
             className="space-y-4"
             noValidate
           >
-            {/* ── Full Name ─────────────────────────────────────── */}
-            <form.Field
-              name="name"
-              validators={{
-                onBlur:  registerSchema.shape.name,
-                onSubmit: registerSchema.shape.name,
-              }}
-            >
-              {(field) => {
-                const hasError = field.state.meta.errors.length > 0;
-                return (
-                  <div>
-                    <label htmlFor={field.name} style={labelStyle}>
-                      Full Name
-                    </label>
-                    <div className="relative">
-                      <User
-                        size={16}
-                        style={{
-                          position: 'absolute',
-                          left: '1rem',
-                          top: '50%',
-                          transform: 'translateY(-50%)',
-                          color: 'var(--platinum)',
-                          opacity: hasError ? 0.6 : 0.35,
-                        }}
-                      />
-                      <input
-                        id={field.name}
-                        name={field.name}
-                        type="text"
-                        value={field.state.value}
-                        onChange={(e) => field.handleChange(e.target.value)}
-                        onBlur={field.handleBlur}
-                        className="input-luxury"
-                        style={{
-                          paddingLeft: '2.5rem',
-                          borderColor: hasError ? 'rgba(248,113,113,0.5)' : undefined,
-                        }}
-                        placeholder="James Otieno"
-                        autoComplete="name"
-                        aria-invalid={hasError}
-                        aria-describedby={hasError ? `${field.name}-error` : undefined}
-                      />
-                    </div>
-                    <FieldError errors={field.state.meta.errors} />
-                  </div>
-                );
-              }}
-            </form.Field>
-
-            {/* ── Email ─────────────────────────────────────────── */}
-            <form.Field
-              name="email"
-              validators={{
-                onBlur:  registerSchema.shape.email,
-                onSubmit: registerSchema.shape.email,
-              }}
-            >
-              {(field) => {
-                const hasError = field.state.meta.errors.length > 0;
-                return (
-                  <div>
-                    <label htmlFor={field.name} style={labelStyle}>
-                      Email
-                    </label>
-                    <div className="relative">
-                      <Mail
-                        size={16}
-                        style={{
-                          position: 'absolute',
-                          left: '1rem',
-                          top: '50%',
-                          transform: 'translateY(-50%)',
-                          color: 'var(--platinum)',
-                          opacity: hasError ? 0.6 : 0.35,
-                        }}
-                      />
-                      <input
-                        id={field.name}
-                        name={field.name}
-                        type="email"
-                        value={field.state.value}
-                        onChange={(e) => field.handleChange(e.target.value)}
-                        onBlur={field.handleBlur}
-                        className="input-luxury"
-                        style={{
-                          paddingLeft: '2.5rem',
-                          borderColor: hasError ? 'rgba(248,113,113,0.5)' : undefined,
-                        }}
-                        placeholder="your@email.com"
-                        autoComplete="email"
-                        aria-invalid={hasError}
-                        aria-describedby={hasError ? `${field.name}-error` : undefined}
-                      />
-                    </div>
-                    <FieldError errors={field.state.meta.errors} />
-                  </div>
-                );
-              }}
-            </form.Field>
-
-            {/* ── Password ──────────────────────────────────────── */}
+            {/* ── New Password ──────────────────────────────────── */}
             <form.Field
               name="password"
               validators={{
-                onBlur:  registerSchema.shape.password,
-                onSubmit: registerSchema.shape.password,
+                onBlur:   resetPasswordSchema.shape.password,
+                onSubmit: resetPasswordSchema.shape.password,
               }}
             >
               {(field) => {
@@ -291,7 +190,7 @@ export default function RegisterPage() {
                 return (
                   <div>
                     <label htmlFor={field.name} style={labelStyle}>
-                      Password
+                      New Password
                     </label>
                     <div className="relative">
                       <Lock
@@ -308,20 +207,40 @@ export default function RegisterPage() {
                       <input
                         id={field.name}
                         name={field.name}
-                        type="password"
+                        type={showPassword ? 'text' : 'password'}
                         value={field.state.value}
                         onChange={(e) => field.handleChange(e.target.value)}
                         onBlur={field.handleBlur}
                         className="input-luxury"
                         style={{
                           paddingLeft: '2.5rem',
+                          paddingRight: '2.5rem',
                           borderColor: hasError ? 'rgba(248,113,113,0.5)' : undefined,
                         }}
                         placeholder="••••••••"
                         autoComplete="new-password"
+                        autoFocus
                         aria-invalid={hasError}
                         aria-describedby={hasError ? `${field.name}-error` : undefined}
                       />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((prev) => !prev)}
+                        style={{
+                          position: 'absolute',
+                          right: '1rem',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: 'var(--platinum)',
+                          opacity: 0.35,
+                        }}
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
                     </div>
                     <FieldError errors={field.state.meta.errors} />
                     {field.state.value.length > 0 && !hasError && (
@@ -341,55 +260,94 @@ export default function RegisterPage() {
               }}
             </form.Field>
 
-            {/* ── Terms ─────────────────────────────────────────── */}
+            {/* ── Confirm Password ──────────────────────────────── */}
             <form.Field
-              name="terms"
+              name="confirmPassword"
               validators={{
-                onSubmit: ({ value }) => termsValidator(value),
-                onBlur:   ({ value }) => termsValidator(value),
+                onBlur: ({ value, fieldApi }) => {
+                  if (value !== fieldApi.form.getFieldValue('password')) {
+                    return 'Passwords do not match';
+                  }
+                },
+                onSubmit: ({ value, fieldApi }) => {
+                  if (value !== fieldApi.form.getFieldValue('password')) {
+                    return 'Passwords do not match';
+                  }
+                },
               }}
             >
-              {(field) => (
-                <div>
-                  <label className="flex items-start gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={field.state.value}
-                      onChange={(e) => field.handleChange(e.target.checked)}
-                      onBlur={field.handleBlur}
-                      style={{
-                        accentColor: 'var(--gold)',
-                        marginTop: '0.1rem',
-                        flexShrink: 0,
-                      }}
-                    />
-                    <span
-                      style={{
-                        fontSize: '0.78rem',
-                        color: 'var(--platinum)',
-                        opacity: 0.55,
-                        lineHeight: 1.5,
-                      }}
-                    >
-                      I agree to the{' '}
-                      <Link
-                        href="/terms"
-                        style={{ color: 'var(--gold)', textDecoration: 'none' }}
+              {(field) => {
+                const hasError = field.state.meta.errors.length > 0;
+                return (
+                  <div>
+                    <label htmlFor={field.name} style={labelStyle}>
+                      Confirm Password
+                    </label>
+                    <div className="relative">
+                      <Lock
+                        size={16}
+                        style={{
+                          position: 'absolute',
+                          left: '1rem',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          color: 'var(--platinum)',
+                          opacity: hasError ? 0.6 : 0.35,
+                        }}
+                      />
+                      <input
+                        id={field.name}
+                        name={field.name}
+                        type={showConfirm ? 'text' : 'password'}
+                        value={field.state.value}
+                        onChange={(e) => field.handleChange(e.target.value)}
+                        onBlur={field.handleBlur}
+                        className="input-luxury"
+                        style={{
+                          paddingLeft: '2.5rem',
+                          paddingRight: '2.5rem',
+                          borderColor: hasError ? 'rgba(248,113,113,0.5)' : undefined,
+                        }}
+                        placeholder="••••••••"
+                        autoComplete="new-password"
+                        aria-invalid={hasError}
+                        aria-describedby={hasError ? `${field.name}-error` : undefined}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirm((prev) => !prev)}
+                        style={{
+                          position: 'absolute',
+                          right: '1rem',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: 'var(--platinum)',
+                          opacity: 0.35,
+                        }}
+                        aria-label={showConfirm ? 'Hide password' : 'Show password'}
                       >
-                        Terms of Service
-                      </Link>{' '}
-                      and{' '}
-                      <Link
-                        href="/privacy"
-                        style={{ color: 'var(--gold)', textDecoration: 'none' }}
+                        {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                    <FieldError errors={field.state.meta.errors} />
+                    {field.state.value.length > 0 && !hasError && (
+                      <p
+                        style={{
+                          fontSize: '0.72rem',
+                          color: 'var(--gold)',
+                          opacity: 0.7,
+                          marginTop: '0.4rem',
+                        }}
                       >
-                        Privacy Policy
-                      </Link>
-                    </span>
-                  </label>
-                  <FieldError errors={field.state.meta.errors} />
-                </div>
-              )}
+                        ✓ Passwords match
+                      </p>
+                    )}
+                  </div>
+                );
+              }}
             </form.Field>
 
             {/* ── Submit ────────────────────────────────────────── */}
@@ -401,28 +359,11 @@ export default function RegisterPage() {
                   disabled={isSubmitting || !canSubmit}
                   aria-busy={isSubmitting}
                 >
-                  {isSubmitting ? 'Creating account…' : 'Create Account'}
+                  {isSubmitting ? 'Updating password…' : 'Update Password'}
                 </button>
               )}
             </form.Subscribe>
           </form>
-
-          <p
-            style={{
-              fontSize: '0.8rem',
-              color: 'var(--platinum)',
-              opacity: 0.45,
-              textAlign: 'center',
-            }}
-          >
-            Already a member?{' '}
-            <Link
-              href={ROUTES.LOGIN}
-              style={{ color: 'var(--gold)', textDecoration: 'none' }}
-            >
-              Sign in
-            </Link>
-          </p>
         </div>
       </div>
     </div>
